@@ -14,6 +14,8 @@ import com.vanniktech.emoji.emoji.Emoji;
 
 import java.lang.ref.SoftReference;
 
+import static android.util.DisplayMetrics.DENSITY_XHIGH;
+
 public class IosEmoji extends Emoji {
   private static final Object LOCK = new Object();
   private static final int NUM_STRIPS = 51;
@@ -30,6 +32,8 @@ public class IosEmoji extends Emoji {
 
   private final int x;
   private final int y;
+
+  private volatile int scale = -1;
 
   public IosEmoji(@NonNull final int[] codePoints, final int x, final int y) {
     super(codePoints, -1);
@@ -64,10 +68,17 @@ public class IosEmoji extends Emoji {
     Bitmap bitmap = BITMAP_CACHE.get(key);
     if (bitmap != null)
       return new BitmapDrawable(context.getResources(), bitmap);
+    if (scale == -1) scale = getScale(context.getResources());
     Bitmap strip = loadStrip(context);
-    Bitmap cut = Bitmap.createBitmap(strip, 1, y * 66 + 1, 64, 64);
+    int size = 66 / scale;
+    Bitmap cut = Bitmap.createBitmap(strip, 0, y * size, size, size);
     BITMAP_CACHE.put(key, cut);
     return new BitmapDrawable(context.getResources(), cut);
+  }
+
+  private int getScale(Resources resources) {
+    int density = resources.getDisplayMetrics().densityDpi;
+    return density < DENSITY_XHIGH ? 2 : 1;
   }
 
   private Bitmap loadStrip(final Context context) {
@@ -80,7 +91,9 @@ public class IosEmoji extends Emoji {
           Resources resources = context.getResources();
           int resId = resources.getIdentifier("emoji_ios_sheet_" + x,
               "drawable", context.getPackageName());
-          strip = BitmapFactory.decodeResource(resources, resId);
+          BitmapFactory.Options options = new BitmapFactory.Options();
+          options.inSampleSize = scale;
+          strip = BitmapFactory.decodeResource(resources, resId, options);
           STRIP_REFS[x] = new SoftReference<>(strip);
         }
       }
